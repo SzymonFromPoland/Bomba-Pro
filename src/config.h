@@ -1,6 +1,11 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// Variables
+
+const int threshold = 500;
+
+
 // MCP23008 xshut pin mapping
 
 const int sc = 7;
