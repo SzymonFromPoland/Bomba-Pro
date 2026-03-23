@@ -7,9 +7,19 @@
 #include "sensors.h"
 #include "motors.h"
 
+#include <flag_detector_inferencing.h>
+
 Adafruit_NeoPixel pixels(7, leds, NEO_GRB + NEO_KHZ800);
 Adafruit_MCP23X08 mcp;
 VL53L1X_ULD sensor[sc];
+
+float features[2];
+
+int get_data(size_t offset, size_t length, float *out_ptr)
+{
+  memcpy(out_ptr, features + offset, length * sizeof(float));
+  return 0;
+}
 
 void setup()
 {
@@ -24,42 +34,46 @@ void setup()
   pinMode(btn, INPUT_PULLUP);
 }
 
+const uint32_t LOOP_PERIOD_US = 10000; // 10 ms = 100 Hz
+uint32_t lastLoopTime = 0;
+
 void loop()
 {
-  VL53L1X_Result_t result[sc];
-  read_sensors(result);
+  uint32_t now = micros();
 
-  // if (!digitalRead(btn))
-  //   callibrate();
+  if (now - lastLoopTime >= LOOP_PERIOD_US)
+  {
+    lastLoopTime += LOOP_PERIOD_US; // stable drift-free timing
 
-  // drive(100, 100);
-  // delay(1000);
+    VL53L1X_Result_t results[sc];
+    read_sensors(results);
 
-  // // backward
-  // drive(-100, -100);
-  // delay(1000);
+    Serial.printf("%d, %d, %d, %d\n\r",
+                  results[3].Distance,
+                  results[3].SigPerSPAD,
+                  results[3].NumSPADs,
+                  results[3].Status);
 
-  // // spin right
-  // drive(100, -100);
-  // delay(1000);
+    // ---- ML part (unchanged, ready for 100Hz inference) ----
+    /*
+    features[0] = results[3].Distance;
+    features[1] = results[3].SigPerSPAD;
 
-  // // spin left
-  // drive(-100, 100);
-  // delay(1000);
+    signal_t signal;
+    signal.total_length = 2;
+    signal.get_data = get_data;
 
-  // // gentle forward
-  // drive(50, 50);
-  // delay(1000);
+    ei_impulse_result_t result;
 
-  // // curve right
-  // drive(100, 50);
-  // delay(1000);
+    if (run_classifier(&signal, &result, false) == EI_IMPULSE_OK)
+    {
+      String classified =
+        (result.classification[0].value > result.classification[1].value)
+        ? "NO_FLAG"
+        : "YES_FLAG";
 
-  // // curve left
-  // drive(50, 100);
-  // delay(1000);
-
-  // // stop
-  // drive(0, 0);
-  // delay(1000);
+      Serial.printf("Classified: %s\n", classified.c_str());
+    }
+    */
+  }
 }
