@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include "config.h"
 #include "sensors.h"
+#include "motors.h"
 
 Adafruit_NeoPixel pixels(7, leds, NEO_GRB + NEO_KHZ800);
 Adafruit_MCP23X08 mcp;
@@ -13,65 +14,23 @@ VL53L1X_ULD sensor[sc];
 void setup()
 {
   Serial.begin(115200);
+  // delay(1500);
   pixels.begin();
+  Wire.begin(sda, scl, 400000);
 
-  Wire.begin(sda, scl, 100000);
+  setup_motors();
+  setup_sensors();
 
-  pixels.fill(pixels.Color(0, 0, 0));
-  pixels.show();
-
-  delay(250);
-
-  for (int i = 0; i < sc; i++)
-  {
-    pixels.setPixelColor(i, pixels.Color(0, 80, 0));
-    pixels.show();
-    delay(40);
-  }
-
-  delay(250);
-
-  pixels.fill(pixels.Color(0, 0, 0));
-  pixels.show();
-
-  Serial.println("All sensors initialized successfully!");
-
-  pinMode(m1a, OUTPUT);
-  pinMode(m1b, OUTPUT);
-  pinMode(m2a, OUTPUT);
-  pinMode(m2b, OUTPUT);
-  pinMode(pwm1, OUTPUT);
-  pinMode(pwm2, OUTPUT);
-  pinMode(stby, OUTPUT);
-
-  digitalWrite(stby, HIGH);
+  pinMode(btn, INPUT_PULLUP);
 }
 
 void loop()
 {
-  VL53L1X_Result_t results;
-  for (int i = 0; i < sc; i++)
-  {
-    sensor[i].GetResult(&results);
-    uint16_t distance = (results.Status == 0) ? results.Distance : threshold;
+  VL53L1X_Result_t result[sc];
+  read_sensors(result);
 
-    if (distance < threshold)
-    {
-      pixels.setPixelColor(i, pixels.Color(0, 0, 80));
-    }
-    else
-    {
-      pixels.setPixelColor(i, pixels.Color(0, 0, 0));
-    }
-
-    pixels.show();
-
-    Serial.printf("%d ", distance);
-
-    sensor[i].ClearInterrupt();
-  }
-
-  Serial.println();
+  // if (!digitalRead(btn))
+  //   callibrate();
 
   // drive(100, 100);
   // delay(1000);

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <config.h>
 
+void setup_motors();
 void drive(int left, int right);
 
 #endif

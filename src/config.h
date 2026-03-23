@@ -3,7 +3,8 @@
 
 // Variables
 
-const int threshold = 500;
+const uint16_t threshold = 500;
+const int brightness = 200;
 
 
 // MCP23008 xshut pin mapping
