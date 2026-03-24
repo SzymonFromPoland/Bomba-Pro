@@ -34,27 +34,26 @@ void setup()
   pinMode(btn, INPUT_PULLUP);
 }
 
-const uint32_t LOOP_PERIOD_US = 10000; // 10 ms = 100 Hz
+const uint32_t LOOP_PERIOD_US = 10000;
 uint32_t lastLoopTime = 0;
 
 void loop()
 {
-  uint32_t now = micros();
+  static uint32_t nextTime = micros();
 
-  if (now - lastLoopTime >= LOOP_PERIOD_US)
+  if ((int32_t)(micros() - nextTime) >= 0)
   {
-    lastLoopTime += LOOP_PERIOD_US; // stable drift-free timing
+    nextTime += 10000;
 
     VL53L1X_Result_t results[sc];
     read_sensors(results);
 
-    Serial.printf("%d, %d, %d, %d\n\r",
+    Serial.printf("%d, %d, %d\n",
                   results[3].Distance,
                   results[3].SigPerSPAD,
-                  results[3].NumSPADs,
-                  results[3].Status);
+                  results[3].NumSPADs);
 
-    // ---- ML part (unchanged, ready for 100Hz inference) ----
+    // ML (when enabled)
     /*
     features[0] = results[3].Distance;
     features[1] = results[3].SigPerSPAD;
@@ -67,12 +66,10 @@ void loop()
 
     if (run_classifier(&signal, &result, false) == EI_IMPULSE_OK)
     {
-      String classified =
-        (result.classification[0].value > result.classification[1].value)
+      Serial.printf("Class: %s\n",
+        result.classification[0].value > result.classification[1].value
         ? "NO_FLAG"
-        : "YES_FLAG";
-
-      Serial.printf("Classified: %s\n", classified.c_str());
+        : "YES_FLAG");
     }
     */
   }
