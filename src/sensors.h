@@ -24,4 +24,6 @@ extern Adafruit_MCP23X08 mcp;
 extern VL53L1X_ULD sensor[sc];
 extern Adafruit_NeoPixel pixels;
 
+extern bool hold_led;
+
 #endif

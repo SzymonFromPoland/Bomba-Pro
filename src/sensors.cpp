@@ -110,21 +110,25 @@ void read_sensors(VL53L1X_Result_t *results, bool ignoreFlags)
                 uint16_t distance = min(results[i].Distance, threshold);
                 if (seesFlag)
                 {
-                    pixels.setPixelColor(i, pixels.Color(50, 50, 0));
+                    if (!hold_led)
+                        pixels.setPixelColor(i, pixels.Color(50, 50, 0));
                     distance = 0;
                 }
                 else
                 {
-                    pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
+                    if (!hold_led)
+                        pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
                 }
             }
         }
         else
         {
-            pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
+            if (!hold_led)
+                pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
         }
 
-        pixels.show();
+        if (!hold_led)
+            pixels.show();
 
         sensor[i].ClearInterrupt();
     }

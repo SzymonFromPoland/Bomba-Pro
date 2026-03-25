@@ -6,10 +6,13 @@
 #include <config.h>
 #include <sensors.h>
 #include <motors.h>
+#include <start_module.h>
 
 Adafruit_NeoPixel pixels(7, leds, NEO_GRB + NEO_KHZ800);
 Adafruit_MCP23X08 mcp;
 VL53L1X_ULD sensor[sc];
+
+Preferences prefs_global;
 
 void setup()
 {
@@ -20,6 +23,7 @@ void setup()
 
   setup_motors();
   setup_sensors();
+  startIRTask((uint8_t) rcv);
 
   pinMode(btn, INPUT_PULLUP);
 }
@@ -29,6 +33,9 @@ uint32_t lastLoopTime = 0;
 
 void loop()
 {
+
+  digitalWrite(stby, started);
+
   static uint32_t nextTime = micros();
 
   if ((int32_t)(micros() - nextTime) >= 0)
@@ -44,5 +51,7 @@ void loop()
     //               results[3].NumSPADs);
 
     printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\n\r", results[0].Distance, results[1].Distance, results[2].Distance, results[3].Distance, results[4].Distance, results[5].Distance, results[6].Distance);
+
+    drive(100, 50);
   }
 }

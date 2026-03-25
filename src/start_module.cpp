@@ -10,7 +10,6 @@ bool started = false;
 void irTask(void *parameter)
 {
   uint8_t START, STOP;
-  uint8_t ledPin = (uint8_t)(uintptr_t)parameter;
 
   prefs_global.begin("robot", true);
   STOP = prefs_global.getUInt("stop_address", 0);
@@ -38,9 +37,11 @@ void irTask(void *parameter)
         hold_led = true;
         for (int i = 0; i < 5; i++)
         {
-          digitalWrite(ledPin, HIGH);
+          pixels.fill(pixels.Color(brightness, brightness, brightness));
+          pixels.show();
           vTaskDelay(50 / portTICK_PERIOD_MS);
-          digitalWrite(ledPin, LOW);
+          pixels.clear();
+          pixels.show();
           vTaskDelay(50 / portTICK_PERIOD_MS);
         }
         hold_led = false;
@@ -57,8 +58,8 @@ void irTask(void *parameter)
   }
 }
 
-void startIRTask(uint8_t pin, uint8_t ledPin)
+void startIRTask(uint8_t pin)
 {
   rc5_global = RC5(pin);
-  xTaskCreatePinnedToCore(irTask, "IR_Task", 8192, (void *)(uintptr_t)ledPin, 1, &IRTaskHandle, 1);
+  xTaskCreatePinnedToCore(irTask, "IR_Task", 8192, nullptr, 1, &IRTaskHandle, 1);
 }
