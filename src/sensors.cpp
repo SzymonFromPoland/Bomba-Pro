@@ -1,5 +1,4 @@
 #include "sensors.h"
-#include "flag_detector_inferencing.h"
 
 int16_t offsets[7] = {1, 1, -58, 2, -32, -24, -18};
 uint16_t xtalks[7] = {61831, 40635, 2808, 60635, 1970, 42614, 53359};
@@ -91,41 +90,8 @@ void read_sensors(VL53L1X_Result_t *results, bool ignoreFlags)
         sensor[i].GetResult(&results[i]);
         uint16_t distance = (results[i].Status == 0) ? min(results[i].Distance, threshold) : threshold;
 
-        if (ignoreFlags)
-        {
-            features[0] = results[i].Distance;
-            features[1] = results[i].SigPerSPAD;
-            features[2] = results[i].NumSPADs;
-
-            signal_t signal;
-            signal.total_length = 3;
-            signal.get_data = get_data;
-
-            ei_impulse_result_t result;
-
-            if (run_classifier(&signal, &result, false) == EI_IMPULSE_OK)
-            {
-                bool seesFlag = result.classification[1].value > result.classification[0].value;
-
-                uint16_t distance = min(results[i].Distance, threshold);
-                if (seesFlag)
-                {
-                    if (!hold_led)
-                        pixels.setPixelColor(i, pixels.Color(50, 50, 0));
-                    distance = 0;
-                }
-                else
-                {
-                    if (!hold_led)
-                        pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
-                }
-            }
-        }
-        else
-        {
-            if (!hold_led)
-                pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
-        }
+        if (!hold_led)
+            pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
 
         if (!hold_led)
             pixels.show();
@@ -133,6 +99,7 @@ void read_sensors(VL53L1X_Result_t *results, bool ignoreFlags)
         sensor[i].ClearInterrupt();
     }
 }
+
 void callibrate()
 {
     pixels.clear();

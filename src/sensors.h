@@ -18,8 +18,6 @@ void set_sensor_settings(VL53L1X_ULD &sensor, EDistanceMode mode, uint16_t roi_x
 void setup_sensors();
 void callibrate();
 
-int get_data(size_t offset, size_t length, float *out_ptr);
-
 extern Adafruit_MCP23X08 mcp;
 extern VL53L1X_ULD sensor[sc];
 extern Adafruit_NeoPixel pixels;
