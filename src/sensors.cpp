@@ -1,7 +1,16 @@
 #include "sensors.h"
+#include "flag_detector_inferencing.h"
 
 int16_t offsets[7] = {1, 1, -58, 2, -32, -24, -18};
 uint16_t xtalks[7] = {61831, 40635, 2808, 60635, 1970, 42614, 53359};
+
+float features[3];
+
+int get_data(size_t offset, size_t length, float *out_ptr)
+{
+    memcpy(out_ptr, features + offset, length * sizeof(float));
+    return 0;
+}
 
 bool init_sensor(VL53L1X_ULD &sensor, uint8_t address, uint8_t xshut)
 {
@@ -25,8 +34,8 @@ void set_sensor_settings(VL53L1X_ULD &sensor, EDistanceMode mode, uint16_t roi_x
     sensor.SetInterMeasurementInMs(inter_measurement);
     sensor.SetInterruptPolarity(ActiveLOW);
     sensor.SetDistanceThreshold(0, threshold, Out);
-    // sensor.SetXTalk(xtalk);          // Where is your xtalk? Dont need it... 
-    // sensor.SetOffsetInMm(offset);  
+    // sensor.SetXTalk(xtalk);          // Where is your xtalk? Dont need it...
+    // sensor.SetOffsetInMm(offset);
     sensor.StartRanging();
 }
 
@@ -65,7 +74,7 @@ void setup_sensors()
                 ;
         }
 
-        set_sensor_settings(sensor[i], Short, 9, 5, 61, 15, 15, threshold, xtalks[i], offsets[i]);
+        set_sensor_settings(sensor[i], Short, 11, 4, 61, 15, 15, threshold, xtalks[i], offsets[i]); // roi 9x4 center 61
         pixels.setPixelColor(i, pixels.Color(0, brightness, 0));
         pixels.show();
         Serial.printf("Sensor %d initialized and moved to 0x%02X\n", i, sensor[i].GetI2CAddress());
@@ -75,19 +84,51 @@ void setup_sensors()
     pixels.show();
 }
 
-void read_sensors(VL53L1X_Result_t *results)
+void read_sensors(VL53L1X_Result_t *results, bool ignoreFlags)
 {
-
     for (int i = 0; i < sc; i++)
     {
         sensor[i].GetResult(&results[i]);
         uint16_t distance = (results[i].Status == 0) ? min(results[i].Distance, threshold) : threshold;
-        pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
+
+        if (ignoreFlags)
+        {
+            features[0] = results[i].Distance;
+            features[1] = results[i].SigPerSPAD;
+            features[2] = results[i].NumSPADs;
+
+            signal_t signal;
+            signal.total_length = 3;
+            signal.get_data = get_data;
+
+            ei_impulse_result_t result;
+
+            if (run_classifier(&signal, &result, false) == EI_IMPULSE_OK)
+            {
+                bool seesFlag = result.classification[1].value > result.classification[0].value;
+
+                uint16_t distance = min(results[i].Distance, threshold);
+                if (seesFlag)
+                {
+                    pixels.setPixelColor(i, pixels.Color(50, 50, 0));
+                    distance = 0;
+                }
+                else
+                {
+                    pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
+                }
+            }
+        }
+        else
+        {
+            pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
+        }
+
         pixels.show();
+
         sensor[i].ClearInterrupt();
     }
 }
-
 void callibrate()
 {
     pixels.clear();

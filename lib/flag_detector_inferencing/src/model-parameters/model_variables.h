@@ -48,25 +48,25 @@
 
 const char* ei_classifier_inferencing_categories_863089_1[] = { "no_flag", "yes_flag" };
 
-EI_CLASSIFIER_DSP_AXES_INDEX_TYPE ei_dsp_config_863089_4_axes[] = { 0, 1 };
-const uint32_t ei_dsp_config_863089_4_axes_size = 2;
+EI_CLASSIFIER_DSP_AXES_INDEX_TYPE ei_dsp_config_863089_4_axes[] = { 0, 1, 2 };
+const uint32_t ei_dsp_config_863089_4_axes_size = 3;
 ei_dsp_config_raw_t ei_dsp_config_863089_4 = {
     4, // uint32_t blockId
     1, // int implementationVersion
-    2, // int length of axes
+    3, // int length of axes
     1.0f // float scale-axes
 };
 
-const float ei_dn_standard_scaler_mean_863089_4[2] = { 179.231517526507, 20620.07737733484 };
-const float ei_dn_standard_scaler_scale_863089_4[2] = { 0.01123335682672772, 0.00005293494468583107 };
-const float ei_dn_standard_scaler_var_863089_4[2] = { 7924.66461350933, 356874134.88416165 };
+const float ei_dn_standard_scaler_mean_863089_4[3] = { 135.33145833333336, 19164.599000000002, 18.929291666666664 };
+const float ei_dn_standard_scaler_scale_863089_4[3] = { 0.010279308398584002, 0.00005308584771892356, 0.061384575473092506 };
+const float ei_dn_standard_scaler_var_863089_4[3] = { 9463.945010373263, 354848101.6091991, 265.3881253315971 };
 ei_data_normalization_standard_scaler_config_t ei_data_normalization_standard_scaler_config_863089_4 = {
     .mean_data = (float *)ei_dn_standard_scaler_mean_863089_4,
-    .mean_data_len = 2,
+    .mean_data_len = 3,
     .scale_data = (float *)ei_dn_standard_scaler_scale_863089_4,
-    .scale_data_len = 2,
+    .scale_data_len = 3,
     .var_data = (float *)ei_dn_standard_scaler_var_863089_4,
-    .var_data_len = 2
+    .var_data_len = 3
 };
 ei_data_normalization_t ei_data_normalization_config_863089_4 = {
     (void *) &ei_data_normalization_standard_scaler_config_863089_4, // config
@@ -81,7 +81,7 @@ const uint8_t ei_dsp_blocks_863089_1_size = 1;
 ei_model_dsp_t ei_dsp_blocks_863089_1[ei_dsp_blocks_863089_1_size] = {
     { // DSP block 4
         4,
-        2, // output size
+        3, // output size
         &extract_raw_features, // DSP function pointer
         (void*)&ei_dsp_config_863089_4, // pointer to config struct
         ei_dsp_config_863089_4_axes, // array of offsets into the input stream, one for each axis
@@ -154,17 +154,17 @@ const ei_impulse_t impulse_863089_1 = {
     .project_name = "flag_detector",
     .impulse_id = 1,
     .impulse_name = "Impulse #1",
-    .deploy_version = 7,
+    .deploy_version = 8,
 
-    .nn_input_frame_size = 2,
+    .nn_input_frame_size = 3,
     .raw_sample_count = 1,
-    .raw_samples_per_frame = 2,
-    .dsp_input_frame_size = 1 * 2,
+    .raw_samples_per_frame = 3,
+    .dsp_input_frame_size = 1 * 3,
     .input_width = 0,
     .input_height = 0,
     .input_frames = 0,
-    .interval_ms = 18.181818181818183,
-    .frequency = 55,
+    .interval_ms = 10,
+    .frequency = 100,
 
     .dsp_blocks_size = ei_dsp_blocks_863089_1_size,
     .dsp_blocks = ei_dsp_blocks_863089_1,
@@ -180,7 +180,7 @@ const ei_impulse_t impulse_863089_1 = {
     .inferencing_engine = EI_CLASSIFIER_TFLITE,
 
     .sensor = EI_CLASSIFIER_SENSOR_FUSION,
-    .fusion_string = "distance + sps",
+    .fusion_string = "distance + sps + ns",
     .slice_size = (1/4),
     .slices_per_model_window = 4,
 

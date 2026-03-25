@@ -3,23 +3,13 @@
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_MCP23X08.h>
 #include <Wire.h>
-#include "config.h"
-#include "sensors.h"
-#include "motors.h"
-
-#include <flag_detector_inferencing.h>
+#include <config.h>
+#include <sensors.h>
+#include <motors.h>
 
 Adafruit_NeoPixel pixels(7, leds, NEO_GRB + NEO_KHZ800);
 Adafruit_MCP23X08 mcp;
 VL53L1X_ULD sensor[sc];
-
-float features[2];
-
-int get_data(size_t offset, size_t length, float *out_ptr)
-{
-  memcpy(out_ptr, features + offset, length * sizeof(float));
-  return 0;
-}
 
 void setup()
 {
@@ -48,29 +38,11 @@ void loop()
     VL53L1X_Result_t results[sc];
     read_sensors(results);
 
-    Serial.printf("%d, %d, %d\n",
-                  results[3].Distance,
-                  results[3].SigPerSPAD,
-                  results[3].NumSPADs);
+    // Serial.printf("%d, %d, %d\n",
+    //               results[3].Distance,
+    //               results[3].SigPerSPAD,
+    //               results[3].NumSPADs);
 
-    // ML (when enabled)
-    /*
-    features[0] = results[3].Distance;
-    features[1] = results[3].SigPerSPAD;
-
-    signal_t signal;
-    signal.total_length = 2;
-    signal.get_data = get_data;
-
-    ei_impulse_result_t result;
-
-    if (run_classifier(&signal, &result, false) == EI_IMPULSE_OK)
-    {
-      Serial.printf("Class: %s\n",
-        result.classification[0].value > result.classification[1].value
-        ? "NO_FLAG"
-        : "YES_FLAG");
-    }
-    */
+    printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\n\r", results[0].Distance, results[1].Distance, results[2].Distance, results[3].Distance, results[4].Distance, results[5].Distance, results[6].Distance);
   }
 }
