@@ -3,14 +3,6 @@
 int16_t offsets[7] = {1, 1, -58, 2, -32, -24, -18};
 uint16_t xtalks[7] = {61831, 40635, 2808, 60635, 1970, 42614, 53359};
 
-float features[3];
-
-int get_data(size_t offset, size_t length, float *out_ptr)
-{
-    memcpy(out_ptr, features + offset, length * sizeof(float));
-    return 0;
-}
-
 bool init_sensor(VL53L1X_ULD &sensor, uint8_t address, uint8_t xshut)
 {
     delay(50);
@@ -83,7 +75,7 @@ void setup_sensors()
     pixels.show();
 }
 
-void read_sensors(VL53L1X_Result_t *results, bool ignoreFlags)
+void read_sensors(VL53L1X_Result_t *results)
 {
     for (int i = 0; i < sc; i++)
     {

@@ -21,12 +21,12 @@ void drive(int left, int right)
     int pwmLeft = map(abs(left), 0, 100, 0, 255);
     int pwmRight = map(abs(right), 0, 100, 0, 255);
 
-    if (left > 0)
+    if (left < 0)
     {
         digitalWrite(m1a, HIGH);
         digitalWrite(m1b, LOW);
     }
-    else if (left < 0)
+    else if (left > 0)
     {
         digitalWrite(m1a, LOW);
         digitalWrite(m1b, HIGH);
@@ -37,12 +37,12 @@ void drive(int left, int right)
         digitalWrite(m1b, LOW);
     }
 
-    if (right > 0)
+    if (right < 0)
     {
         digitalWrite(m2a, HIGH);
         digitalWrite(m2b, LOW);
     }
-    else if (right < 0)
+    else if (right > 0)
     {
         digitalWrite(m2a, LOW);
         digitalWrite(m2b, HIGH);

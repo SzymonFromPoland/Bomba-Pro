@@ -1,6 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+
 // Variables
 
 const uint16_t threshold = 500;
