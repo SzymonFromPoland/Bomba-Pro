@@ -5,9 +5,9 @@ uint16_t xtalks[7] = {61831, 40635, 2808, 60635, 1970, 42614, 53359};
 
 bool init_sensor(VL53L1X_ULD &sensor, uint8_t address, uint8_t xshut)
 {
-    delay(50);
+    delay(10);
     mcp.digitalWrite(xshut, HIGH);
-    delay(50);
+    delay(10);
     VL53L1_Error result = sensor.Begin(0x29);
     if (result != VL53L1_ERROR_NONE)
         return false;
@@ -42,7 +42,7 @@ void setup_sensors()
     if (!mcp.begin_I2C(0x20, &Wire))
     {
         Serial.println("Error: MCP23008 not found!");
-        pixels.fill(pixels.Color(80, 0, 0));
+        pixels.fill(pixels.Color(50, 0, 0));
         pixels.show();
         while (1)
             ;
@@ -75,21 +75,32 @@ void setup_sensors()
     pixels.show();
 }
 
-void read_sensors(VL53L1X_Result_t *results)
+void read_sensors(VL53L1X_Result_t *results, float *error)
 {
+    float eps = 1e-3f;
+
+    float numerator = 0.0f;
+    float denominator = 0.0f;
+
     for (int i = 0; i < sc; i++)
     {
         sensor[i].GetResult(&results[i]);
-        uint16_t distance = (results[i].Status == 0) ? min(results[i].Distance, threshold) : threshold;
+        results[i].Distance = (results[i].Status == 0) ? min(results[i].Distance, threshold) : threshold;
+        float s = 1.0f / (results[i].Distance + eps);
+        int position = i - 3;
+        numerator += s * position;
+        denominator += s;
 
         if (!hold_led)
-            pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - distance, 0, threshold, 0, brightness))));
-
-        if (!hold_led)
-            pixels.show();
-
-        sensor[i].ClearInterrupt();
+        {
+            pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - results[i].Distance, 0, threshold, 0, brightness))));
+            
+        }
     }
+
+    pixels.show();
+
+    *error = (denominator > 0.0001f) ? (numerator / denominator) : 0.0f;
 }
 
 void callibrate()

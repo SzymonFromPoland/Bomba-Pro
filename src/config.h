@@ -4,7 +4,7 @@
 
 // Variables
 
-const uint16_t threshold = 500;
+const uint16_t threshold = 250;
 const int brightness = 200;
 
 

@@ -35,14 +35,14 @@ void irTask(void *parameter)
         prefs_global.end();
 
         hold_led = true;
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 7; i++)
         {
-          pixels.fill(pixels.Color(brightness, brightness, brightness));
+          pixels.fill(pixels.Color(255, 255, 255));
           pixels.show();
-          vTaskDelay(50 / portTICK_PERIOD_MS);
+          vTaskDelay(30 / portTICK_PERIOD_MS);
           pixels.clear();
           pixels.show();
-          vTaskDelay(50 / portTICK_PERIOD_MS);
+          vTaskDelay(30 / portTICK_PERIOD_MS);
         }
         hold_led = false;
         vTaskDelay(500 / portTICK_PERIOD_MS);
