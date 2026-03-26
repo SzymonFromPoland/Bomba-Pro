@@ -14,12 +14,12 @@ VL53L1X_ULD sensor[sc];
 
 Preferences prefs_global;
 
-float Kp = 100.0;
-float Kd = 35.0;
+float Kp = 50.0;
+float Kd = 17.0;
 
 int mode = 1;
 
-int base_speed = 100;
+float base_speed = 67;
 int last_dir = -1;
 
 volatile float error = 0;
@@ -30,7 +30,7 @@ void setup()
 {
   Serial.begin(115200);
   pixels.begin();
-  Wire.begin(sda, scl, 800000);
+  Wire.begin(sda, scl, 500000);
 
   setup_motors();
   setup_sensors();
@@ -88,33 +88,41 @@ void loop()
     increment_mode();
     while (!digitalRead(btn))
       delay(10);
-    delay(600);
+    delay(400);
     hold_led = false;
   }
 
   digitalWrite(stby, started);
 
   VL53L1X_Result_t results[sc];
+  bool ut[sc];
   float error;
   float output;
-  read_sensors(results, &error);
+  read_sensors(results, &error, ut);
+
+  if (error < -0.01)
+    last_dir = -1;
+  else if (error > 0.1)
+    last_dir = 1;
+
   output = pd(error, dt, Kp, Kd);
 
-  bool aat =
-      (results[0].Distance == threshold) &&
-      (results[1].Distance == threshold) &&
-      (results[2].Distance == threshold) &&
-      (results[3].Distance == threshold) &&
-      (results[4].Distance == threshold) &&
-      (results[5].Distance == threshold) &&
-      (results[6].Distance == threshold);
+  bool aat = std::none_of(ut, ut + sc, [](bool b)
+                          { return b; });
 
   if (aat)
-    drive(base_speed, -base_speed);
+  {
+    base_speed = 67;
+    drive(base_speed * last_dir, -base_speed * last_dir);
+  }
   else
-    drive(base_speed + round(output), base_speed - round(output));
+  {
+    if (ut[2] || ut[3] || ut[4])
+      base_speed = constrain(base_speed + 0.67, 67, 100);
+    drive(base_speed + output, base_speed - output);
+  }
 
   unsigned long loopTime = millis() - loopStart;
 
-  printf("%lu\t%d\t%d\t%d\t%d\t%d\t%d\t%d\tmode: %d\terror: %.2f\toutput: %.2f\n\r", loopTime, results[0].Distance, results[1].Distance, results[2].Distance, results[3].Distance, results[4].Distance, results[5].Distance, results[6].Distance, mode, error, output);
+  printf("%lu\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\tmode: %d\terror: %.2f\toutput: %.2f\tlast_dir: %d\n\r", loopTime, results[0].Status, results[0].Distance, results[1].Status, results[1].Distance, results[2].Status, results[2].Distance, results[3].Status, results[3].Distance, results[4].Status, results[4].Distance, results[5].Status, results[5].Distance, results[6].Status, results[6].Distance, mode, error, output, last_dir);
 }

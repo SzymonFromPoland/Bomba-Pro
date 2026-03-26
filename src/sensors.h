@@ -8,12 +8,15 @@
 #include <config.h>
 
 /*!
+
     @brief this function reads information from sensors.
     @param results sensor data as a list (ex. results[0])
 */
-void read_sensors(VL53L1X_Result_t *results, float *error);
-bool init_sensor(VL53L1X_ULD &sensor, uint8_t address, uint8_t xshut);
-void set_sensor_settings(VL53L1X_ULD &sensor, EDistanceMode mode, uint16_t roi_x, uint16_t roi_y, uint8_t roi_center, uint16_t timing_budget, uint16_t inter_measurement, uint16_t threshold);
+void read_sensors(VL53L1X_Result_t *results, float *error, bool *dist_ut);
+bool init_sensor(VL53L1X_ULD &sensor, uint8_t address, uint8_t xshut, int index);
+void set_sensor_settings(VL53L1X_ULD &sensor, VL53L1X_Settings settings);
+void change_settings(VL53L1X_Settings settings);
+
 void setup_sensors();
 void callibrate();
 
