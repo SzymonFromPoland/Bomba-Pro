@@ -52,7 +52,10 @@ void irTask(void *parameter)
         if (command == START)
           started = true;
         else if (command == STOP)
+        {
           started = false;
+          mode = start_mode;
+        }
       }
     }
   }

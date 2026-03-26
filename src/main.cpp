@@ -7,6 +7,7 @@
 #include <sensors.h>
 #include <motors.h>
 #include <start_module.h>
+#include <tuner.h>
 
 Adafruit_NeoPixel pixels(7, leds, NEO_GRB + NEO_KHZ800);
 Adafruit_MCP23X08 mcp;
@@ -15,29 +16,17 @@ VL53L1X_ULD sensor[sc];
 Preferences prefs_global;
 
 float Kp = 50.0;
-float Kd = 17.0;
+float Kd = 12.0;
 
-int mode = 1;
+int mode = 0;
+int start_mode = 1;
 
 float base_speed = 67;
 int last_dir = -1;
 
-volatile float error = 0;
+float error = 0;
+float output = 0;
 VL53L1X_Result_t results[sc];
-portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-
-void setup()
-{
-  Serial.begin(115200);
-  pixels.begin();
-  Wire.begin(sda, scl, 500000);
-
-  setup_motors();
-  setup_sensors();
-  startIRTask((uint8_t)rcv);
-
-  pinMode(btn, INPUT_PULLUP);
-}
 
 void increment_mode()
 {
@@ -46,6 +35,29 @@ void increment_mode()
   for (int i = 0; i < mode; i++)
     pixels.setPixelColor(i, pixels.Color(75, 50, 0));
   pixels.show();
+}
+
+void setup()
+{
+  Serial.begin(115200);
+  pixels.begin();
+  Wire.begin(sda, scl, 500000);
+
+  pinMode(btn, INPUT_PULLUP);
+
+  prefs_global.begin("robot", true);
+  start_mode = prefs_global.getInt("start_mode", 1);
+  prefs_global.end();
+  mode = start_mode - 1;
+
+  setup_motors();
+  setup_sensors();
+  startIRTask((uint8_t)rcv);
+
+  startTuner(&Kp, &Kd, &base_speed, results, &error, &output);
+
+  increment_mode();
+  delay(400);
 }
 
 float prev_error = 0;
@@ -73,6 +85,7 @@ float pd(float error, float dt, float Kp, float Kd)
 float dt;
 unsigned long lastTime = 0;
 unsigned long loopStart = 0;
+unsigned long spinStart = 0;
 
 void loop()
 {
@@ -88,16 +101,23 @@ void loop()
     increment_mode();
     while (!digitalRead(btn))
       delay(10);
+
+    start_mode = mode;
+    prefs_global.begin("robot", false);
+    prefs_global.putInt("start_mode", start_mode);
+    prefs_global.end();
+
+    if (mode == 1)
+      change_settings(def);
+    if (mode == 2)
+      change_settings(medium);
     delay(400);
     hold_led = false;
   }
 
   digitalWrite(stby, started);
 
-  VL53L1X_Result_t results[sc];
   bool ut[sc];
-  float error;
-  float output;
   read_sensors(results, &error, ut);
 
   if (error < -0.01)
@@ -112,14 +132,26 @@ void loop()
 
   if (aat)
   {
-    base_speed = 67;
-    drive(base_speed * last_dir, -base_speed * last_dir);
+    if (spinStart == 0)
+      spinStart = millis();
+    float spin_speed = (millis() - spinStart < 34) ? 100 : 50;
+    drive(spin_speed * last_dir, -spin_speed * last_dir);
   }
-  else
+  else if (mode == 1)
   {
+    spinStart = 0;
     if (ut[2] || ut[3] || ut[4])
-      base_speed = constrain(base_speed + 0.67, 67, 100);
+      base_speed = constrain(base_speed + 0.67, 0, 100);
     drive(base_speed + output, base_speed - output);
+  }
+  else if (mode == 2)
+  {
+    spinStart = 0;
+    base_speed = constrain(base_speed + 0.25, 0, 30);
+    drive(base_speed + output, base_speed - output);
+    if (results[3].Distance < 40 && started)
+      mode = 1;
+      base_speed = 30;
   }
 
   unsigned long loopTime = millis() - loopStart;

@@ -38,8 +38,7 @@ const int xshut_pins[sc] = {xs1, xs2, xs3, xs4, xs5, xs6, xs7};
 const int addresses[sc] = {0x54, 0x56, 0x58, 0x5A, 0x5C, 0x5E, 0x60};
 
 const VL53L1X_Settings def = {Short, 14, 4, 61, 15, 15, threshold};
-const VL53L1X_Settings medium = {Long, 14, 5, 61, 20, 20, threshold};
-const VL53L1X_Settings far = {Long, 14, 5, 61, 33, 33, threshold};
+const VL53L1X_Settings medium = {Long, 14, 4, 61, 20, 20, threshold};
 
 // Motor driver pin mapping
 const int stby = 15;

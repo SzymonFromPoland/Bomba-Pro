@@ -10,6 +10,8 @@ extern bool started;
 extern bool hold_led;
 extern Preferences prefs_global;
 extern Adafruit_NeoPixel pixels;
+extern int mode;
+extern int start_mode;
 
 void startIRTask(uint8_t pin);
 
