@@ -86,6 +86,7 @@ float dt;
 unsigned long lastTime = 0;
 unsigned long loopStart = 0;
 unsigned long spinStart = 0;
+unsigned long lastSawTime = 0;
 
 void loop()
 {
@@ -134,12 +135,14 @@ void loop()
   {
     if (spinStart == 0)
       spinStart = millis();
-    float spin_speed = (millis() - spinStart < 34) ? 100 : 50;
+    bool slowSpin = (millis() - lastSawTime < 1000);
+    float spin_speed = (millis() - spinStart < 34) ? 100 : (slowSpin ? 45 : 50);
     drive(spin_speed * last_dir, -spin_speed * last_dir);
   }
   else if (mode == 1)
   {
     spinStart = 0;
+    lastSawTime = millis();
     if (ut[2] || ut[3] || ut[4])
       base_speed = constrain(base_speed + 0.67, 0, 100);
     drive(base_speed + output, base_speed - output);
@@ -147,6 +150,7 @@ void loop()
   else if (mode == 2)
   {
     spinStart = 0;
+    lastSawTime = millis();
     base_speed = constrain(base_speed + 0.25, 0, 30);
     drive(base_speed + output, base_speed - output);
     if (results[3].Distance < 40 && started)
