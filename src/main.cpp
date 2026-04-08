@@ -18,8 +18,8 @@ Preferences prefs_global;
 float Kp = 50.0;
 float Kd = 12.0;
 
-int mode = 0;
-int start_mode = 1;
+int mode = 1;
+int dyn_mode = 1;
 
 float base_speed = 67;
 int last_dir = -1;
@@ -28,11 +28,56 @@ float error = 0;
 float output = 0;
 VL53L1X_Result_t results[sc];
 
-void increment_mode()
+void handle_mode()
 {
+
+  static unsigned long hold_time = 0;
+  bool pressed = false;
+
+  if (digitalRead(btn))
+    hold_time = millis();
+
+  pressed = (millis() - hold_time > 150);
+
+  if (pressed && !started)
+  {
+    hold_led = true;
+
+    mode++;
+    mode = (mode > 3) ? 1 : mode;
+    dyn_mode = mode;
+
+    pixels.clear();
+    for (int i = 0; i < dyn_mode; i++)
+      pixels.setPixelColor(i, pixels.Color(75, 50, 0));
+    pixels.show();
+
+    while (!digitalRead(btn))
+      delay(10);
+
+    prefs_global.begin("robot", false);
+    prefs_global.putInt("start_mode", mode);
+    prefs_global.end();
+
+    if (dyn_mode == 1)
+      change_settings(def);
+    if (dyn_mode == 2)
+      change_settings(medium);
+
+    delay(400);
+    hold_led = false;
+  }
+}
+
+void load_mode()
+{
+  prefs_global.begin("robot", true);
+  mode = prefs_global.getInt("start_mode", 1);
+  prefs_global.end();
+  dyn_mode = mode;
+
   pixels.clear();
-  mode = (mode + 1 > 3) ? 1 : mode + 1;
-  for (int i = 0; i < mode; i++)
+  for (int i = 0; i < dyn_mode; i++)
     pixels.setPixelColor(i, pixels.Color(75, 50, 0));
   pixels.show();
 }
@@ -42,22 +87,15 @@ void setup()
   Serial.begin(115200);
   pixels.begin();
   Wire.begin(sda, scl, 500000);
-
   pinMode(btn, INPUT_PULLUP);
-
-  prefs_global.begin("robot", true);
-  start_mode = prefs_global.getInt("start_mode", 1);
-  prefs_global.end();
-  mode = start_mode - 1;
 
   setup_motors();
   setup_sensors();
   startIRTask((uint8_t)rcv);
 
-  startTuner(&Kp, &Kd, &base_speed, results, &error, &output);
+  load_mode();
 
-  increment_mode();
-  delay(400);
+  startTuner(&Kp, &Kd, &base_speed, results, &error, &output);
 }
 
 float prev_error = 0;
@@ -84,7 +122,6 @@ float pd(float error, float dt, float Kp, float Kd)
 
 float dt;
 unsigned long lastTime = 0;
-unsigned long loopStart = 0;
 unsigned long spinStart = 0;
 unsigned long lastSawTime = 0;
 
@@ -94,27 +131,7 @@ void loop()
   dt = (now - lastTime) / 1000.0;
   lastTime = now;
 
-  loopStart = millis();
-
-  if (!digitalRead(btn) && !started)
-  {
-    hold_led = true;
-    increment_mode();
-    while (!digitalRead(btn))
-      delay(10);
-
-    start_mode = mode;
-    prefs_global.begin("robot", false);
-    prefs_global.putInt("start_mode", start_mode);
-    prefs_global.end();
-
-    if (mode == 1)
-      change_settings(def);
-    if (mode == 2)
-      change_settings(medium);
-    delay(400);
-    hold_led = false;
-  }
+  handle_mode();
 
   digitalWrite(stby, started);
 
@@ -139,7 +156,7 @@ void loop()
     float spin_speed = (millis() - spinStart < 34) ? 100 : (slowSpin ? 45 : 50);
     drive(spin_speed * last_dir, -spin_speed * last_dir);
   }
-  else if (mode == 1)
+  else if (dyn_mode == 1)
   {
     spinStart = 0;
     lastSawTime = millis();
@@ -147,18 +164,18 @@ void loop()
       base_speed = constrain(base_speed + 0.67, 0, 100);
     drive(base_speed + output, base_speed - output);
   }
-  else if (mode == 2)
+  else if (dyn_mode == 2)
   {
     spinStart = 0;
     lastSawTime = millis();
     base_speed = constrain(base_speed + 0.25, 0, 30);
     drive(base_speed + output, base_speed - output);
     if (results[3].Distance < 40 && started)
-      mode = 1;
-      base_speed = 30;
+      dyn_mode = 1;
+    base_speed = 30;
   }
 
-  unsigned long loopTime = millis() - loopStart;
+  unsigned long loopTime = millis() - now;
 
-  printf("%lu\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\tmode: %d\terror: %.2f\toutput: %.2f\tlast_dir: %d\n\r", loopTime, results[0].Status, results[0].Distance, results[1].Status, results[1].Distance, results[2].Status, results[2].Distance, results[3].Status, results[3].Distance, results[4].Status, results[4].Distance, results[5].Status, results[5].Distance, results[6].Status, results[6].Distance, mode, error, output, last_dir);
+  printf("%lu\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\tmode: %d\terror: %.2f\toutput: %.2f\tlast_dir: %d\n\r", loopTime, results[0].Status, results[0].Distance, results[1].Status, results[1].Distance, results[2].Status, results[2].Distance, results[3].Status, results[3].Distance, results[4].Status, results[4].Distance, results[5].Status, results[5].Distance, results[6].Status, results[6].Distance, dyn_mode, error, output, last_dir);
 }

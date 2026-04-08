@@ -54,7 +54,7 @@ void irTask(void *parameter)
         else if (command == STOP)
         {
           started = false;
-          mode = start_mode;
+          dyn_mode = mode;
         }
       }
     }
