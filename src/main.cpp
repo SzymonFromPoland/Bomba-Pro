@@ -2,6 +2,7 @@
 #include <VL53L1X_ULD.h>
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_MCP23X08.h>
+#include <Adafruit_MPU6050.h>
 #include <Wire.h>
 #include <config.h>
 #include <sensors.h>
@@ -27,6 +28,7 @@ int last_dir = -1;
 float error = 0;
 float output = 0;
 VL53L1X_Result_t results[sc];
+Adafruit_MPU6050 mpu;
 
 void handle_mode()
 {
@@ -87,11 +89,19 @@ void setup()
   Serial.begin(115200);
   pixels.begin();
   Wire.begin(sda, scl, 500000);
+
   pinMode(btn, INPUT_PULLUP);
 
   setup_motors();
   setup_sensors();
   startIRTask((uint8_t)rcv);
+
+  mpu.begin(0x68, &Wire);
+  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+  mpu.setGyroRange(MPU6050_RANGE_2000_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_260_HZ);
+  mpu.setSampleRateDivisor(0);
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
 
   load_mode();
 
@@ -124,6 +134,8 @@ float dt;
 unsigned long lastTime = 0;
 unsigned long spinStart = 0;
 unsigned long lastSawTime = 0;
+
+float yaw = 0;
 
 void loop()
 {
@@ -177,5 +189,12 @@ void loop()
 
   unsigned long loopTime = millis() - now;
 
-  printf("%lu\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\tmode: %d\terror: %.2f\toutput: %.2f\tlast_dir: %d\n\r", loopTime, results[0].Status, results[0].Distance, results[1].Status, results[1].Distance, results[2].Status, results[2].Distance, results[3].Status, results[3].Distance, results[4].Status, results[4].Distance, results[5].Status, results[5].Distance, results[6].Status, results[6].Distance, dyn_mode, error, output, last_dir);
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  float rate = (g.gyro.z) * RAD_TO_DEG;
+  yaw += rate * dt;
+
+  Serial.printf("Yaw: %.2f\n", yaw);
+
+  // printf("%lu\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\tmode: %d\terror: %.2f\toutput: %.2f\tlast_dir: %d\n\r", loopTime, results[0].Status, results[0].Distance, results[1].Status, results[1].Distance, results[2].Status, results[2].Distance, results[3].Status, results[3].Distance, results[4].Status, results[4].Distance, results[5].Status, results[5].Distance, results[6].Status, results[6].Distance, dyn_mode, error, output, last_dir);
 }

@@ -39,13 +39,13 @@ void drive(int left, int right)
 
     if (right < 0)
     {
-        digitalWrite(m2a, HIGH);
-        digitalWrite(m2b, LOW);
+        digitalWrite(m2a, LOW);
+        digitalWrite(m2b, HIGH);
     }
     else if (right > 0)
     {
-        digitalWrite(m2a, LOW);
-        digitalWrite(m2b, HIGH);
+        digitalWrite(m2a, HIGH);
+        digitalWrite(m2b, LOW);
     }
     else
     {
