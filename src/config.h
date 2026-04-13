@@ -15,12 +15,8 @@ typedef struct
 
 } VL53L1X_Settings;
 
-// Variables
-
 const uint16_t threshold = 567;
 const int brightness = 200;
-
-// MCP23008 xshut pin mapping
 
 const int sc = 7;
 
@@ -40,7 +36,6 @@ const int addresses[sc] = {0x54, 0x56, 0x58, 0x5A, 0x5C, 0x5E, 0x60};
 const VL53L1X_Settings def = {Short, 14, 4, 61, 15, 15, threshold};
 const VL53L1X_Settings medium = {Long, 14, 4, 61, 20, 20, threshold};
 
-// Motor driver pin mapping
 const int stby = 15;
 
 const int pwm1 = 12;
@@ -51,20 +46,12 @@ const int pwm2 = 18;
 const int m2a = 16;
 const int m2b = 17;
 
-// I2C pins
 const int scl = 10;
 const int sda = 11;
 
-// Interrupt pin for MPU6050 sensor
 const int interrupt = 9;
-
-// RGB LEDs pin
 const int leds = 8;
-
-// IR receiver pin
 const int rcv = 4;
-
-// User button pin
 const int btn = 1;
 
 #endif

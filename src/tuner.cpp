@@ -3,135 +3,183 @@
 #include <ESPAsyncWebServer.h>
 
 static AsyncWebServer server(80);
-
-static float *_kp;
-static float *_kd;
-static float *_base_speed;
+static TuningParam *_params;
+static int _numParams;
 static VL53L1X_Result_t *_results;
-static float *_error;
-static float *_output;
+static Preferences *_prefs;
 
-static const char HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+static const char HTML_HEAD[] PROGMEM = R"HTML(<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
 <style>
-  body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; }
-  label { display: flex; justify-content: space-between; margin-bottom: 4px; }
-  input[type=range] { width: 100%; margin-bottom: 16px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-  td, th { border: 1px solid #ccc; padding: 4px 8px; text-align: center; font-size: 13px; }
-  th { background: #f0f0f0; }
-  #error, #output { font-size: 18px; font-weight: bold; margin-top: 12px; }
-</style>
-</head>
-<body>
+  body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f4f9; color: #333; -webkit-user-select: none; user-select: none; }
+  .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  .param-group { margin-bottom: 12px; padding: 10px; border-radius: 4px; border: 1px solid #eee; background: #fff; }
+  .read-only { background: #fdfdfd; border-left: 4px solid #007bff; }
+  label { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-bottom: 8px; }
+  
+  /* Shared Button Styles */
+  .btn { background: #007bff; color: white; border: none; border-radius: 6px; padding: 12px; min-width: 60px; font-size: 20px; cursor: pointer; touch-action: manipulation; transition: 0.1s; }
+  .btn:active { background: #0056b3; transform: scale(0.95); }
+  
+  /* Specific Button Type Style */
+  .btn-action { width: 100%; background: #28a745; font-size: 16px; font-weight: bold; text-transform: uppercase; }
+  .btn-action:active { background: #1e7e34; }
+
+  .control-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .val-display { font-family: monospace; font-size: 20px; color: #007bff; font-weight: bold; min-width: 80px; text-align: center; }
+
+  input[type=range] { width: 100%; margin: 10px 0; }
+
+  .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-round { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+  .slider-round:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+  input:checked + .slider-round { background-color: #2196F3; }
+  input:checked + .slider-round:before { transform: translateX(24px); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+  th, td { border: 1px solid #ddd; padding: 4px; text-align: center; }
+</style></head><body>
 <h2>Bomba-Pro Tuner</h2>
-
-<label><span>Kp</span><span id="kpVal"></span></label>
-<input type="range" id="kp" min="0" max="300" step="1" oninput="send('kp',this.value)">
-
-<label><span>Kd</span><span id="kdVal"></span></label>
-<input type="range" id="kd" min="0" max="100" step="0.5" oninput="send('kd',this.value)">
-
-<label><span>Base speed</span><span id="bsVal"></span></label>
-<input type="range" id="bs" min="0" max="100" step="1" oninput="send('bs',this.value)">
-
-<table>
-  <tr><th>#</th><th>Dist</th><th>Status</th></tr>
-  <tr><td>0</td><td id="d0">-</td><td id="s0">-</td></tr>
-  <tr><td>1</td><td id="d1">-</td><td id="s1">-</td></tr>
-  <tr><td>2</td><td id="d2">-</td><td id="s2">-</td></tr>
-  <tr><td>3</td><td id="d3">-</td><td id="s3">-</td></tr>
-  <tr><td>4</td><td id="d4">-</td><td id="s4">-</td></tr>
-  <tr><td>5</td><td id="d5">-</td><td id="s5">-</td></tr>
-  <tr><td>6</td><td id="d6">-</td><td id="s6">-</td></tr>
-</table>
-
-<p>Error: <span id="error">-</span></p>
-<p>Output: <span id="output">-</span></p>
+<div id="controls" class="card"></div>
+<div class="card">
+  <table><thead><tr><th>ID</th><th>Dist</th><th>Stat</th></tr></thead><tbody id="sensorBody"></tbody></table>
+</div>
 
 <script>
-function send(param, value) {
-  document.getElementById(param+'Val').innerText = value;
-  fetch('/set?'+param+'='+value);
+let holdTimer, repeatInterval, isInteracting = false, lockTimeout, configData = [];
+
+function sendVal(id, val) {
+  fetch(`/set?id=${id}&val=${val}`);
 }
-fetch('/get').then(r=>r.json()).then(d=>{
-  ['kp','kd','bs'].forEach(k=>{
-    document.getElementById(k).value = d[k];
-    document.getElementById(k+'Val').innerText = d[k];
-  });
-});
-function updateData() {
-  fetch('/data').then(r=>r.json()).then(d=>{
-    for(let i=0;i<7;i++){
-      document.getElementById('d'+i).innerText = d.s[i].d;
-      document.getElementById('s'+i).innerText = d.s[i].st;
+
+function changeValue(id, step) {
+  let el = document.getElementById(id+'Val');
+  let cfg = configData.find(p => p.id === id);
+  let newVal = Math.min(cfg.max, Math.max(cfg.min, parseFloat(el.innerText) + step));
+  el.innerText = newVal.toFixed(2);
+  sendVal(id, newVal.toFixed(2));
+}
+
+function startHold(e, id, dir) {
+  if (e.cancelable) e.preventDefault();
+  isInteracting = true; clearTimeout(lockTimeout);
+  let cfg = configData.find(p => p.id === id);
+  let step = cfg.step * dir;
+  changeValue(id, step);
+  holdTimer = setTimeout(() => { repeatInterval = setInterval(() => changeValue(id, step), 80); }, 400);
+}
+
+function stopHold() {
+  clearTimeout(holdTimer); clearInterval(repeatInterval);
+  lockTimeout = setTimeout(() => { isInteracting = false; }, 500);
+}
+
+fetch('/config').then(r=>r.json()).then(data=>{
+  configData = data;
+  let html = '';
+  data.forEach(p => {
+    // type 3 is READONLY, type 4 is BUTTON (no label-value row needed for button)
+    html += `<div class="param-group ${p.type==3?'read-only':''}">`;
+    
+    if(p.type != 4) {
+        html += `<label><span>${p.label}</span>${p.type!=1 ? `<span id="${p.id}Val" class="val-text">${p.val.toFixed(2)}</span>` : ''}</label>`;
     }
-    document.getElementById('error').innerText = d.err.toFixed(3);
-    document.getElementById('output').innerText = d.out.toFixed(1);
+    
+    if(p.type == 0) { // Slider
+      html += `<input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.val}" oninput="document.getElementById('${p.id}Val').innerText=this.value; sendVal('${p.id}',this.value)">`;
+    } else if(p.type == 1) { // Arrows
+      html += `<div class="control-row">
+        <button class="btn" onmousedown="startHold(event,'${p.id}',-1)" ontouchstart="startHold(event,'${p.id}',-1)" onmouseup="stopHold()" ontouchend="stopHold()">&larr;</button>
+        <span id="${p.id}Val" class="val-display">${p.val.toFixed(2)}</span>
+        <button class="btn" onmousedown="startHold(event,'${p.id}',1)" ontouchstart="startHold(event,'${p.id}',1)" onmouseup="stopHold()" ontouchend="stopHold()">&rarr;</button>
+      </div>`;
+    } else if(p.type == 2) { // Toggle
+      html += `<label class="switch"><input type="checkbox" ${p.val>0.5?'checked':''} onchange="sendVal('${p.id}', this.checked?1:0)"><span class="slider-round"></span></label>`;
+    } else if(p.type == 4) { // Button - sets value to p.min
+      html += `<button class="btn btn-action" onclick="sendVal('${p.id}', ${p.min})">${p.label}</button>`;
+    }
+    html += `</div>`;
   });
-}
-setInterval(updateData, 100);
-</script>
-</body>
-</html>)HTML";
+  document.getElementById('controls').innerHTML = html;
+});
+
+setInterval(() => {
+  if (isInteracting) return;
+  fetch('/data').then(r=>r.json()).then(d => {
+    for (const [id, val] of Object.entries(d.v)) {
+      let el = document.getElementById(id+'Val');
+      if(el) el.innerText = val.toFixed(2);
+    }
+    let sH = '';
+    d.s.forEach((s, i) => { sH += `<tr><td>${i}</td><td>${s.d}</td><td style="color:${s.st==0?'green':'red'}">${s.st}</td></tr>`; });
+    document.getElementById('sensorBody').innerHTML = sH;
+  });
+}, 250);
+</script></body></html>)HTML";
 
 static void tunerTask(void *param)
 {
-    WiFi.softAP("Bomba-Pro", "12345678");
+  WiFi.softAP("Bomba-Pro", "12345678");
+  
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *req) { 
+      req->send(200, "text/html", HTML_HEAD); 
+  });
 
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *req) {
-        req->send(200, "text/html", HTML);
-    });
+  server.on("/config", HTTP_GET, [](AsyncWebServerRequest *req) {
+      AsyncResponseStream *response = req->beginResponseStream("application/json");
+      response->print("[");
+      for(int i=0; i<_numParams; i++) {
+          response->printf("{\"label\":\"%s\",\"id\":\"%s\",\"val\":%.2f,\"min\":%.1f,\"max\":%.1f,\"step\":%.2f,\"type\":%d}%s",
+              _params[i].label, _params[i].id, *_params[i].value, _params[i].min, _params[i].max, _params[i].step, (int)_params[i].type, (i==_numParams-1?"":","));
+      }
+      response->print("]");
+      req->send(response); 
+  });
 
-    server.on("/get", HTTP_GET, [](AsyncWebServerRequest *req) {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "{\"kp\":%.1f,\"kd\":%.1f,\"bs\":%.1f}", *_kp, *_kd, *_base_speed);
-        req->send(200, "application/json", buf);
-    });
+  server.on("/data", HTTP_GET, [](AsyncWebServerRequest *req) {
+      AsyncResponseStream *response = req->beginResponseStream("application/json");
+      response->print("{\"v\":{");
+      for(int i=0; i<_numParams; i++) { 
+          response->printf("\"%s\":%.2f%s", _params[i].id, *_params[i].value, (i==_numParams-1?"":",")); 
+      }
+      response->print("},\"s\":[");
+      for(int i=0; i<7; i++) { 
+          response->printf("{\"d\":%d,\"st\":%d}%s", _results[i].Distance, _results[i].Status, (i==6?"":",")); 
+      }
+      response->print("]}");
+      req->send(response); 
+  });
 
-    server.on("/set", HTTP_GET, [](AsyncWebServerRequest *req) {
-        if (req->hasParam("kp"))  *_kp        = req->getParam("kp")->value().toFloat();
-        if (req->hasParam("kd"))  *_kd        = req->getParam("kd")->value().toFloat();
-        if (req->hasParam("bs"))  *_base_speed = req->getParam("bs")->value().toFloat();
-        req->send(200, "text/plain", "ok");
-    });
+  server.on("/set", HTTP_GET, [](AsyncWebServerRequest *req) {
+      if (req->hasParam("id") && req->hasParam("val")) {
+          String id = req->getParam("id")->value();
+          float val = req->getParam("val")->value().toFloat();
+          for(int i=0; i<_numParams; i++) {
+              if(id == _params[i].id && _params[i].type != TYPE_READONLY) {
+                  *_params[i].value = val;
+                  // Persist to flash if prefs is active
+                  if (_prefs) { 
+                      _prefs->begin("robot", false); 
+                      _prefs->putFloat(_params[i].id, val); 
+                      _prefs->end(); 
+                  }
+                  break;
+              }
+          }
+      }
+      req->send(200, "text/plain", "ok"); 
+  });
 
-    server.on("/data", HTTP_GET, [](AsyncWebServerRequest *req) {
-        char buf[256];
-        int len = snprintf(buf, sizeof(buf),
-            "{\"s\":["
-            "{\"d\":%d,\"st\":%d},"
-            "{\"d\":%d,\"st\":%d},"
-            "{\"d\":%d,\"st\":%d},"
-            "{\"d\":%d,\"st\":%d},"
-            "{\"d\":%d,\"st\":%d},"
-            "{\"d\":%d,\"st\":%d},"
-            "{\"d\":%d,\"st\":%d}"
-            "],\"err\":%.3f,\"out\":%.1f}",
-            _results[0].Distance, _results[0].Status,
-            _results[1].Distance, _results[1].Status,
-            _results[2].Distance, _results[2].Status,
-            _results[3].Distance, _results[3].Status,
-            _results[4].Distance, _results[4].Status,
-            _results[5].Distance, _results[5].Status,
-            _results[6].Distance, _results[6].Status,
-            *_error, *_output);
-        req->send(200, "application/json", buf);
-    });
-
-    server.begin();
-    vTaskDelete(NULL);
+  server.begin();
+  vTaskDelete(NULL);
 }
 
-void startTuner(float *kp, float *kd, float *base_speed, VL53L1X_Result_t *results, float *error, float *output)
+void startTuner(TuningParam *params, int numParams, VL53L1X_Result_t *results, Preferences *prefs)
 {
-    _kp = kp;
-    _kd = kd;
-    _base_speed = base_speed;
-    _results = results;
-    _error = error;
-    _output = output;
-    xTaskCreatePinnedToCore(tunerTask, "tuner", 8192, NULL, 1, NULL, 0);
+  _params = params;
+  _numParams = numParams;
+  _results = results;
+  _prefs = prefs;
+  xTaskCreatePinnedToCore(tunerTask, "tuner", 16384, NULL, 1, NULL, 0);
 }
