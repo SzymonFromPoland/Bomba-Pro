@@ -82,6 +82,8 @@ void load_mode()
   for (int i = 0; i < dyn_mode; i++)
     pixels.setPixelColor(i, pixels.Color(75, 50, 0));
   pixels.show();
+
+  delay(400);
 }
 
 void setup()
@@ -108,26 +110,32 @@ void setup()
   startTuner(&Kp, &Kd, &base_speed, results, &error, &output);
 }
 
-float prev_error = 0;
-float integral = 0;
-float pd(float error, float dt, float Kp, float Kd)
+struct PIDState
 {
-  static float prev_error = 0.0f;
-  static float prev_derivative = 0.0f;
-  if (dt < 0.001f)
-    dt = 0.001f;
+  float prev_error = 0;
+  float prev_derivative = 0;
+  float integral = 0;
+};
+
+PIDState drivePD, gyroPD;
+
+float pid(float error, float dt, float Kp, float Ki, float Kd, PIDState &state, float alpha = 1.0f, float integral_limit = 1000.0f)
+{
+  if (dt < 0.002f)
+    dt = 0.002f;
+
   float P = Kp * error;
-  float derivative = (error - prev_error) / dt;
-  derivative = prev_derivative * derivative;
 
-  prev_derivative = derivative;
-  prev_error = error;
+  state.integral += error * dt;
+  state.integral = constrain(state.integral, -integral_limit, integral_limit);
+  float I = Ki * state.integral;
+  float raw_derivative = (error - state.prev_error) / dt;
+  float derivative = alpha * raw_derivative + (1.0f - alpha) * state.prev_derivative;
 
-  float D = Kd * derivative;
+  state.prev_error = error;
+  state.prev_derivative = derivative;
 
-  float output = P + D;
-
-  return output;
+  return P + I + Kd * derivative;
 }
 
 float dt;
@@ -155,7 +163,7 @@ void loop()
   else if (error > 0.1)
     last_dir = 1;
 
-  output = pd(error, dt, Kp, Kd);
+  output = pid(error, dt, Kp, 0.0f, Kd, drivePD, 1.0f);
 
   bool aat = std::none_of(ut, ut + sc, [](bool b)
                           { return b; });
@@ -193,8 +201,23 @@ void loop()
   mpu.getEvent(&a, &g, &temp);
   float rate = (g.gyro.z) * RAD_TO_DEG;
   yaw += rate * dt;
+  if (yaw < 0)
+    yaw += 360;
+  else if (yaw >= 360)
+    yaw -= 360;
 
-  Serial.printf("Yaw: %.2f\n", yaw);
+  hold_led = true;
+
+  pixels.clear();
+
+  int pos = yaw / 360.0 * 7;
+  for (int i = 0; i < 7; i++)
+  {
+    pixels.setPixelColor(i, (i < pos) ? pixels.Color(35, 0, 0) : pixels.Color(0, 0, 0));
+  }
+  pixels.show();
+
+  // Serial.printf("Yaw: %.2f\n", yaw);
 
   // printf("%lu\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\t(%d)%d\tmode: %d\terror: %.2f\toutput: %.2f\tlast_dir: %d\n\r", loopTime, results[0].Status, results[0].Distance, results[1].Status, results[1].Distance, results[2].Status, results[2].Distance, results[3].Status, results[3].Distance, results[4].Status, results[4].Distance, results[5].Status, results[5].Distance, results[6].Status, results[6].Distance, dyn_mode, error, output, last_dir);
 }
