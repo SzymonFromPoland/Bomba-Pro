@@ -35,6 +35,7 @@ float yaw = 0;
 float target_angle = 0.0f;
 float en_gyro = true;
 float callibrate_flag = false;
+bool target_reached = false;
 
 float error = 0;
 float output = 0;
@@ -43,6 +44,7 @@ Adafruit_MPU6050 mpu;
 
 void callibrate_gyro()
 {
+  pixels.clear();
   int samples = 200;
   float sum = 0;
   sensors_event_t a, g, temp;
@@ -50,6 +52,12 @@ void callibrate_gyro()
   {
     mpu.getEvent(&a, &g, &temp);
     sum += g.gyro.z;
+
+    if (i % 28 == 0)
+    {
+      pixels.setPixelColor(i / 20, pixels.Color(0, 0, 35));
+      pixels.show();
+    }
   }
   bias = sum / (float)samples;
 
@@ -60,16 +68,27 @@ void callibrate_gyro()
 
 void handle_mode()
 {
-
   static unsigned long hold_time = 0;
+
   bool pressed = false;
+  bool held = false;
 
-  if (digitalRead(btn))
-    hold_time = millis();
+  if (!digitalRead(btn))
+  {
+    hold_time = millis() + 1000;
+    while (!digitalRead(btn))
+    {
+      if (millis() > hold_time)
+      {
+        held = true;
+        break;
+      }
+    }
+    if (!held)
+      pressed = true;
+  }
 
-  pressed = (millis() - hold_time > 150);
-
-  if (pressed && !started)
+  if (pressed)
   {
     hold_led = true;
 
@@ -79,11 +98,8 @@ void handle_mode()
 
     pixels.clear();
     for (int i = 0; i < dyn_mode; i++)
-      pixels.setPixelColor(i, pixels.Color(75, 50, 0));
+      pixels.setPixelColor(i, pixels.Color(35, 30, 0));
     pixels.show();
-
-    while (!digitalRead(btn))
-      delay(10);
 
     prefs_global.begin("robot", false);
     prefs_global.putInt("start_mode", mode);
@@ -91,14 +107,25 @@ void handle_mode()
 
     if (dyn_mode == 1)
       change_settings(def);
-    if (dyn_mode == 2)
+    else if (dyn_mode == 2)
       change_settings(medium);
-
-    delay(400);
-    hold_led = false;
-    pixels.clear();
-    pixels.show();
+    else if (dyn_mode == 3)
+      change_settings(def);
   }
+  else if (held)
+  {
+    hold_led = true;
+    callibrate_gyro();
+    callibrate_flag = true;
+  }
+
+  while (!digitalRead(btn))
+    delay(10);
+
+  delay(400);
+  hold_led = false;
+  pixels.clear();
+  pixels.show();
 }
 
 void load_mode()
@@ -148,7 +175,7 @@ void setup()
   base_speed = prefs_global.getFloat("bs", 30.0);
   spin_speed = prefs_global.getFloat("sp", 50.0);
   target_angle = prefs_global.getFloat("targ", 180.0);
-  bias = prefs_global.getFloat("gx_bias", 0.0);
+  bias = prefs_global.getFloat("bias", 0.0);
   prefs_global.end();
 
   static TuningParam mySettings[] = {
@@ -201,15 +228,13 @@ float pid(float error, float dt, float Kp, float Ki, float Kd, PIDState &state, 
 float dt;
 unsigned long lastTime = 0;
 unsigned long closeTime = 0;
-unsigned long targetingTime = 0;
+unsigned long targetTime = 0;
 
 void loop()
 {
   unsigned long now = millis();
   dt = (now - lastTime) / 1000.0;
   lastTime = now;
-
-  handle_mode();
 
   bool ut[sc];
 
@@ -234,7 +259,16 @@ void loop()
     read_sensors(results, &error, ut);
   }
 
-  bool angle_reached = abs(to_target) < 5.0f;
+  if (abs(to_target) <= 5.0f)
+  {
+    if (millis() - targetTime >= 2000)
+      target_reached = true;
+  }
+  else if (!target_reached)
+  {
+    targetTime = millis();
+    target_reached = false;
+  }
 
   if (error < -0.01)
     last_dir = -1;
@@ -299,20 +333,29 @@ void loop()
         right_speed = -spin_speed * last_dir;
       }
     }
+    // MODE 3
     else if (dyn_mode == 3)
     {
       en_gyro = true;
       left_speed = -gyro_output;
       right_speed = gyro_output;
+      if (target_reached)
+      {
+        left_speed = 15;
+        right_speed = 15;
+      }
     }
 
     drive(left_speed, right_speed);
   }
   else
   {
+    handle_mode();
+
     left_speed = 0;
     right_speed = 0;
     ramp_up1 = 0;
+    target_reached = false;
   }
 
   unsigned long loopTime = millis() - now;
