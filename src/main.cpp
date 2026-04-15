@@ -259,7 +259,7 @@ void loop()
   if (callibrate_flag)
     callibrate_gyro();
 
-    if (en_gyro)
+  if (en_gyro)
   {
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
@@ -286,9 +286,9 @@ void loop()
   if (!en_gyro || !started)
     read_sensors(results, &error, ut);
 
-  if (error < -0.01)
+  if ((!started) ? results[0].Distance < 60 || results[1].Distance < 60 || results[2].Distance < 60 : error < -0.01)
     last_dir = -1;
-  else if (error > 0.01)
+  else if ((!started) ? results[4].Distance < 60 || results[5].Distance < 60 || results[6].Distance < 60 : error > 0.01)
     last_dir = 1;
 
   output = pid(error, dt, slow_down ? slowKp : Kp, 0.0f, slow_down ? slowKd : Kd, drivePID, 0.75);
