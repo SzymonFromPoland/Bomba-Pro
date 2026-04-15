@@ -12,39 +12,42 @@
 
 Adafruit_NeoPixel pixels(7, leds, NEO_GRB + NEO_KHZ800);
 Adafruit_MCP23X08 mcp;
+Adafruit_MPU6050 mpu;
 VL53L1X_ULD sensor[sc];
-
+VL53L1X_Result_t results[sc];
 Preferences prefs_global;
 
-float Kp = 50.0;
-float Kd = 12.0;
+float threshold = 500.0f;
 
-float gyroKp = 1.0;
-float gyroKd = 1.0;
+float Kp = 75.0f;
+float Kd = 4.0f;
+float slowKp = 15.0f;
+float slowKd = 0.5f;
+float gyroKp = 2.4f;
+float gyroKd = 0.07f;
 
 int mode = 1;
 int dyn_mode = 1;
 
-float left_speed, right_speed, ramp_up1, gyro_output, to_target, bias;
+float left_speed, right_speed, ramp_up1, gyro_output, to_target, bias, error, output, target_angle;
+float yaw = 0.0f;
 
-float base_speed = 67;
-float spin_speed = 50;
+float base_speed = 50.0f;
+float spin_speed = 50.0f;
+float ramp_up_step = 0.75f;
 int last_dir = -1;
+bool slow_down = false;
 
-float yaw = 0;
-float target_angle = 0.0f;
-float en_gyro = true;
-float callibrate_flag = false;
+bool en_gyro = true;
+bool callibrate_flag = false;
 bool target_reached = false;
-
-float error = 0;
-float output = 0;
-VL53L1X_Result_t results[sc];
-Adafruit_MPU6050 mpu;
 
 void callibrate_gyro()
 {
   pixels.clear();
+  callibrate_flag = false;
+  hold_led = true;
+  yaw = 0.0f;
   int samples = 200;
   float sum = 0;
   sensors_event_t a, g, temp;
@@ -53,13 +56,19 @@ void callibrate_gyro()
     mpu.getEvent(&a, &g, &temp);
     sum += g.gyro.z;
 
-    if (i % 28 == 0)
-    {
-      pixels.setPixelColor(i / 20, pixels.Color(0, 0, 35));
-      pixels.show();
-    }
+    int led = map(i, 0, samples, 0, leds);
+
+    pixels.setPixelColor(round(led), pixels.Color(15, 0, 15));
+    pixels.show();
   }
   bias = sum / (float)samples;
+
+  delay(400);
+  hold_led = false;
+  pixels.clear();
+  pixels.show();
+
+  // Serial.println("Gyro callibrated, bias: " + String(bias));
 
   prefs_global.begin("robot", false);
   prefs_global.putFloat("bias", bias);
@@ -75,7 +84,7 @@ void handle_mode()
 
   if (!digitalRead(btn))
   {
-    hold_time = millis() + 1000;
+    hold_time = millis() + 700;
     while (!digitalRead(btn))
     {
       if (millis() > hold_time)
@@ -93,12 +102,12 @@ void handle_mode()
     hold_led = true;
 
     mode++;
-    mode = (mode > 3) ? 1 : mode;
+    mode = (mode > 4) ? 1 : mode;
     dyn_mode = mode;
 
     pixels.clear();
     for (int i = 0; i < dyn_mode; i++)
-      pixels.setPixelColor(i, pixels.Color(35, 30, 0));
+      pixels.setPixelColor(i, pixels.Color(30, 30, 0));
     pixels.show();
 
     prefs_global.begin("robot", false);
@@ -108,42 +117,37 @@ void handle_mode()
     if (dyn_mode == 1)
       change_settings(def);
     else if (dyn_mode == 2)
-      change_settings(medium);
+      change_settings(def);
     else if (dyn_mode == 3)
       change_settings(def);
+    else if (dyn_mode == 4)
+      change_settings(def);
+
+    while (!digitalRead(btn))
+      delay(10);
+
+    delay(400);
+    hold_led = false;
+    pixels.clear();
+    pixels.show();
   }
   else if (held)
   {
     hold_led = true;
-    callibrate_gyro();
     callibrate_flag = true;
+    pixels.clear();
+    pixels.fill(pixels.Color(15, 0, 15));
+    pixels.show();
+
+    while (!digitalRead(btn))
+      delay(10);
+
+    pixels.clear();
+    pixels.show();
+
+    delay(400);
+    hold_led = false;
   }
-
-  while (!digitalRead(btn))
-    delay(10);
-
-  delay(400);
-  hold_led = false;
-  pixels.clear();
-  pixels.show();
-}
-
-void load_mode()
-{
-  prefs_global.begin("robot", true);
-  mode = prefs_global.getInt("start_mode", 1);
-  prefs_global.end();
-  dyn_mode = mode;
-
-  pixels.clear();
-  for (int i = 0; i < dyn_mode; i++)
-    pixels.setPixelColor(i, pixels.Color(75, 50, 0));
-  pixels.show();
-
-  delay(400);
-
-  pixels.clear();
-  pixels.show();
 }
 
 void setup()
@@ -165,36 +169,50 @@ void setup()
   mpu.setSampleRateDivisor(0);
   mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
 
-  load_mode();
-
   prefs_global.begin("robot", false);
-  Kp = prefs_global.getFloat("kp", 150.0);
-  Kd = prefs_global.getFloat("kd", 50.0);
-  gyroKp = prefs_global.getFloat("gkp", 1.0);
-  gyroKd = prefs_global.getFloat("gkd", 1.0);
-  base_speed = prefs_global.getFloat("bs", 30.0);
+  Kp = prefs_global.getFloat("kp", 75.0);
+  Kd = prefs_global.getFloat("kd", 4.0);
+  slowKp = prefs_global.getFloat("skp", 15.0);
+  slowKd = prefs_global.getFloat("skd", 0.5);
+  gyroKp = prefs_global.getFloat("gkp", 2.4);
+  gyroKd = prefs_global.getFloat("gkd", 0.07);
+  base_speed = prefs_global.getFloat("bs", 50.0);
   spin_speed = prefs_global.getFloat("sp", 50.0);
-  target_angle = prefs_global.getFloat("targ", 180.0);
+  target_angle = prefs_global.getFloat("targ", 0.0);
   bias = prefs_global.getFloat("bias", 0.0);
+  dyn_mode = mode = prefs_global.getInt("start_mode", 1);
+  threshold = prefs_global.getFloat("threshold", 500);
   prefs_global.end();
+
+  pixels.clear();
+  for (int i = 0; i < dyn_mode; i++)
+    pixels.setPixelColor(i, pixels.Color(30, 30, 0));
+  pixels.show();
+
+  delay(400);
+
+  pixels.clear();
+  pixels.show();
 
   static TuningParam mySettings[] = {
       {"PID Error", "err", &error, 0, 0, 0, TYPE_READONLY},
       {"PID Output", "out", &output, 0, 0, 0, TYPE_READONLY},
+      {"Threshold", "threshold", &threshold, 0, 1000, 5, TYPE_ARROWS},
       {"Gyro Position", "gpos", &yaw, 0, 0, 0, TYPE_READONLY},
       {"Gyro Output", "gout", &gyro_output, 0, 0, 0, TYPE_READONLY},
       {"Reset yaw", "reset_yaw", &yaw, 0, 0, 0, TYPE_BUTTON},
-      {"Callibrate", "callibrate", &callibrate_flag, 1, 0, 0, TYPE_BUTTON},
-      {"Drive Kp", "kp", &Kp, 0, 100, 1, TYPE_ARROWS},
+      {"Drive Kp", "kp", &Kp, 0, 100, 0.5, TYPE_ARROWS},
       {"Drive Kd", "kd", &Kd, 0, 100, 0.5, TYPE_ARROWS},
       {"Base Speed", "bs", &base_speed, 0, 100, 1, TYPE_ARROWS},
       {"Spin Speed", "sp", &spin_speed, 0, 100, 1, TYPE_ARROWS},
+      {"Slow Kp", "skp", &slowKp, 0, 100, 0.5, TYPE_ARROWS},
+      {"Slow Kd", "skd", &slowKd, 0, 100, 0.5, TYPE_ARROWS},
       {"Gyro Kp", "gkp", &gyroKp, 0, 10, 0.05, TYPE_ARROWS},
       {"Gyro Kd", "gkd", &gyroKd, 0, 10, 0.01, TYPE_ARROWS},
       {"Target Angle", "targ", &target_angle, -180, 180, 5, TYPE_SLIDER},
 
   };
-  startTuner(mySettings, 13, results, &prefs_global);
+  startTuner(mySettings, sizeof(mySettings) / sizeof(mySettings[0]), results, &prefs_global);
 }
 
 struct PIDState
@@ -239,12 +257,9 @@ void loop()
   bool ut[sc];
 
   if (callibrate_flag)
-  {
     callibrate_gyro();
-    callibrate_flag = false;
-  }
 
-  if (en_gyro)
+    if (en_gyro)
   {
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
@@ -253,29 +268,30 @@ void loop()
     yaw = fmod(yaw + 360.0f, 360.0f);
     to_target = fmod((target_angle - yaw) + 540.0f, 360.0f) - 180.0f;
     gyro_output = pid(to_target, dt, gyroKp, 0.0f, gyroKd, gyroPID, 1.0f);
-  }
-  else
-  {
-    read_sensors(results, &error, ut);
+
+    if (abs(to_target) <= 5.0f)
+    {
+      if (millis() - targetTime >= 30)
+        target_reached = true;
+    }
+    else if (!target_reached)
+    {
+      targetTime = millis();
+      target_reached = false;
+    }
   }
 
-  if (abs(to_target) <= 5.0f)
-  {
-    if (millis() - targetTime >= 2000)
-      target_reached = true;
-  }
-  else if (!target_reached)
-  {
-    targetTime = millis();
-    target_reached = false;
-  }
+  en_gyro = (dyn_mode == 3 || dyn_mode == 4) && !target_reached;
+
+  if (!en_gyro || !started)
+    read_sensors(results, &error, ut);
 
   if (error < -0.01)
     last_dir = -1;
-  else if (error > 0.1)
+  else if (error > 0.01)
     last_dir = 1;
 
-  output = pid(error, dt, Kp, 0.0f, Kd, drivePID, 1.0f);
+  output = pid(error, dt, slow_down ? slowKp : Kp, 0.0f, slow_down ? slowKd : Kd, drivePID, 0.75);
 
   bool any_ut1 = false;
   for (int i = 0; i < sc; i++)
@@ -294,16 +310,41 @@ void loop()
     // MODE 1
     if (dyn_mode == 1)
     {
-      en_gyro = false;
-      if (any_ut1)
+      if (results[2].Distance < 100 || results[3].Distance < 100 || results[4].Distance < 100)
       {
-        if (ut[2] || ut[3] || ut[4])
-          ramp_up1 = constrain(ramp_up1 + 0.67, -base_speed, base_speed);
-        left_speed = base_speed + ramp_up1 + output;
-        right_speed = base_speed + ramp_up1 - output;
+
+        if (closeTime == 0)
+          closeTime = now;
+
+        slow_down = (now - closeTime < 500);
       }
       else
       {
+        slow_down = false;
+        closeTime = 0;
+      }
+
+      if (any_ut1)
+      {
+
+        if (ut[2] || ut[3] || ut[4])
+          ramp_up1 = constrain(ramp_up1 + ramp_up_step, 0, 100);
+
+        if (slow_down)
+          ramp_up1 = 30.0f - base_speed;
+
+        left_speed = base_speed + ramp_up1 + output;
+        right_speed = base_speed + ramp_up1 - output;
+
+        if (ut[0] || ut[6])
+        {
+          left_speed = spin_speed * last_dir;
+          right_speed = -spin_speed * last_dir;
+        }
+      }
+      else
+      {
+        ramp_up1 = 0;
         left_speed = spin_speed * last_dir;
         right_speed = -spin_speed * last_dir;
       }
@@ -312,11 +353,10 @@ void loop()
     // MODE 2
     else if (dyn_mode == 2)
     {
-      en_gyro = false;
       if (any_ut1)
       {
-        left_speed = 30 + output;
-        right_speed = 30 - output;
+        left_speed = 30.0f + output;
+        right_speed = 30.0f - output;
         if (results[3].Distance > 60)
         {
           closeTime = now;
@@ -324,7 +364,13 @@ void loop()
         else if (now - closeTime > 500)
         {
           dyn_mode = 1;
-          ramp_up1 = 30 - base_speed;
+          ramp_up1 = 30.0f - base_speed;
+        }
+
+        if (ut[0] || ut[6])
+        {
+          left_speed = spin_speed * last_dir;
+          right_speed = -spin_speed * last_dir;
         }
       }
       else
@@ -336,14 +382,22 @@ void loop()
     // MODE 3
     else if (dyn_mode == 3)
     {
-      en_gyro = true;
       left_speed = -gyro_output;
       right_speed = gyro_output;
       if (target_reached)
       {
-        left_speed = 15;
-        right_speed = 15;
+        left_speed = 25.0f;
+        right_speed = 25.0f;
+
+        if (any_ut1)
+          dyn_mode = 1;
       }
+    }
+    // MODE 4 - GYRO DEMO
+    else if (dyn_mode == 4)
+    {
+      left_speed = -gyro_output;
+      right_speed = gyro_output;
     }
 
     drive(left_speed, right_speed);
@@ -355,8 +409,14 @@ void loop()
     left_speed = 0;
     right_speed = 0;
     ramp_up1 = 0;
+    closeTime = 0;
+
+    slow_down = false;
     target_reached = false;
+    target_angle *= last_dir;
   }
+
+  // Serial.println("slow_down: " + String(slow_down));
 
   unsigned long loopTime = millis() - now;
 

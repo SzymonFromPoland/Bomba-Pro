@@ -1,7 +1,7 @@
 #include "start_module.h"
 #include "config.h"
 
-static RC5 rc5_global(rcv);
+static RC5 *rc5_global = nullptr;
 static TaskHandle_t IRTaskHandle;
 
 bool hold_led = false;
@@ -10,6 +10,9 @@ bool started = false;
 void irTask(void *parameter)
 {
   uint8_t START, STOP;
+
+  if (rc5_global == nullptr)
+    vTaskDelete(nullptr);
 
   prefs_global.begin("robot", true);
   STOP = prefs_global.getUInt("stop_address", 0);
@@ -22,7 +25,7 @@ void irTask(void *parameter)
     unsigned char address;
     unsigned char command;
 
-    if (rc5_global.read(&toggle, &address, &command))
+    if (rc5_global->read(&toggle, &address, &command))
     {
       if (address == 0x0B)
       {
@@ -63,6 +66,6 @@ void irTask(void *parameter)
 
 void startIRTask(uint8_t pin)
 {
-  rc5_global = RC5(pin);
+  rc5_global = new RC5(pin);
   xTaskCreatePinnedToCore(irTask, "IR_Task", 8192, nullptr, 1, &IRTaskHandle, 1);
 }

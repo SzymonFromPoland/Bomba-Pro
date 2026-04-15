@@ -13,7 +13,7 @@ bool init_sensor(VL53L1X_ULD &sensor, uint8_t address, uint8_t xshut, int index)
 
     result = sensor.SetI2CAddress(address);
     if (xtalks[index] != -1)
-        sensor.SetXTalk((uint16_t) xtalks[index]);
+        sensor.SetXTalk((uint16_t)xtalks[index]);
     return true;
 }
 
@@ -61,14 +61,14 @@ void setup_sensors()
         if (!init_sensor(sensor[i], addresses[i], xshut_pins[i], i))
         {
             Serial.printf("Error initializing sensor %d at address 0x%02X\n", i, addresses[i]);
-            pixels.setPixelColor(i, pixels.Color(brightness, 0, 0));
+            pixels.setPixelColor(i, pixels.Color(30, 0, 0));
             pixels.show();
             while (1)
                 ;
         }
 
-        set_sensor_settings(sensor[i], def); // roi 9x4 center 61
-        pixels.setPixelColor(i, pixels.Color(0, brightness, 0));
+        set_sensor_settings(sensor[i], def);
+        pixels.setPixelColor(i, pixels.Color(0, 30, 0));
         pixels.show();
         Serial.printf("Sensor %d initialized and moved to 0x%02X\n", i, sensor[i].GetI2CAddress());
     }
@@ -96,22 +96,24 @@ void read_sensors(VL53L1X_Result_t *results, float *error, bool *dist_ut)
     {
         if (!sensor_enabled[i])
         {
-            results[i].Distance = threshold;
+            results[i].Distance = (uint16_t)threshold;
             results[i].Status = 255;
             dist_ut[i] = false;
             continue;
         }
         sensor[i].GetResult(&results[i]);
-        results[i].Distance = (results[i].Status == 0) ? min(results[i].Distance, threshold) : threshold;
-        dist_ut[i] = results[i].Distance < threshold;
+        results[i].Distance = (results[i].Status == 0) ? min(results[i].Distance, (uint16_t)threshold) : (uint16_t)threshold;
+        dist_ut[i] = results[i].Distance < (uint16_t)threshold;
+
         float s = 1.0f / (results[i].Distance + eps);
+
         int position = i - 3;
         numerator += s * position;
         denominator += s;
 
         if (!hold_led)
         {
-            pixels.setPixelColor(i, pixels.Color(0, 0, abs(map(threshold - results[i].Distance, 0, threshold, 0, brightness))));
+            pixels.setPixelColor(i, pixels.Color(0, 0, abs(map((uint16_t)threshold - results[i].Distance, 0, (uint16_t)threshold, 0, brightness))));
         }
     }
 
