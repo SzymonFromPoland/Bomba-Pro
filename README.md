@@ -12,7 +12,7 @@ Bomba-Pro is a compact sumo robot designed for competitive micro-sumo competitio
 - **Mode 1: Opponent Tracking** - Pursues opponents with adaptive speed control
 - **Mode 2: Distance Control** - Slowly approaches the target and switches to mode 1
 - **Mode 3: Gyro Navigation** - Rotates to specified angle then advances forward
-- **Mode 4: Gyro Demo** - Pure rotation testing mode
+<!-- - **Mode 4: Gyro Demo** - Pure rotation testing mode -->
 
 ### Hardware Capabilities
 - **7× VL53L1X Time-of-Flight Sensors** - 200° field of view for opponent detection
@@ -33,13 +33,13 @@ Bomba-Pro is a compact sumo robot designed for competitive micro-sumo competitio
 
 | Component | Part | Notes |
 |-----------|------|-------|
-| Microcontroller | ESP32-S3-MINI-1U | 240MHz dual-core |
+| Microcontroller | ESP32-S3-MINI-1U-N4 | 240MHz dual-core, 4Mb flash|
 | Distance Sensors | VL53L1X (×7) | ToF distance measurement |
 | IMU | MPU6050 | 6-axis gyro + accelerometer |
 | Motors | N20 1000 rpm | Fast and strong |
 | Motor Driver | TB6612FNG | Enough for N20 motors|
 | LED Driver | MCP23008 (GPIO Expander) | Addressable LED control |
 | Status LEDs | WS2812C-2020 (×7) | RGB NeoPixel LEDs |
-| IR Receiver | Generic 38kHz | RC5 protocol compatible |
+| IR Receiver | TSOP4838 | 38kHz, RC5 protocol compatible |
 
 ## TO DO: ADD MORE LATER!
