@@ -2,11 +2,11 @@
 
 A high-performance micro sumo robot powered by the ESP32-S3-MINI-1U microcontroller with advanced autonomous navigation, real-time sensor fusion, and intelligent obstacle avoidance.
 
-## 🎯 Project Overview
+## Project Overview
 
 Bomba-Pro is a compact sumo robot designed for competitive micro-sumo competitions. It features multiple autonomous operating modes with adaptive PID control, gyroscope-based navigation, and real-time distance sensing across 7 directions.
 
-## ✨ Key Features
+## Key Features
 
 ### Operating Modes
 - **Mode 1: Opponent Tracking** - Pursues opponents with adaptive speed control and obstacle awareness
@@ -29,7 +29,7 @@ Bomba-Pro is a compact sumo robot designed for competitive micro-sumo competitio
 - **Gyro Calibration** - Automatic bias measurement with visual LED feedback
 - **Derivative Filtering** - Alpha-blended low-pass filtering for smooth control response
 
-## 🛠️ Hardware Components
+## Hardware Components
 
 | Component | Part | Notes |
 |-----------|------|-------|
