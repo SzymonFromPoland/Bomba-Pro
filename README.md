@@ -65,13 +65,6 @@ Error Input → [P] →
 - When `en_gyro = false`: Uses 7 distance sensors for opponent detection
 - Automatic switching based on operational mode and state
 
-### Opponent Detection
-```
-Left Sensors (0,1,2) < 50mm  → Turn Right (push away)
-Right Sensors (4,5,6) < 50mm → Turn Left (push away)
-Center Sensors detect → Engage with adaptive speed
-```
-
 ## 🚀 Operating Modes Detailed
 
 ### Mode 1: Opponent Tracking
