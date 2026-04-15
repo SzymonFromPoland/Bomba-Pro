@@ -9,8 +9,8 @@ Bomba-Pro is a compact sumo robot designed for competitive micro-sumo competitio
 ## Key Features
 
 ### Operating Modes
-- **Mode 1: Opponent Tracking** - Pursues opponents with adaptive speed control and obstacle awareness
-- **Mode 2: Distance Control** - Maintains precise distance from targets before engaging
+- **Mode 1: Opponent Tracking** - Pursues opponents with adaptive speed control
+- **Mode 2: Distance Control** - Slowly approaches the target and switches to mode 1
 - **Mode 3: Gyro Navigation** - Rotates to specified angle then advances forward
 - **Mode 4: Gyro Demo** - Pure rotation testing mode
 
