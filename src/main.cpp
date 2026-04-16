@@ -26,7 +26,7 @@ float slowKd = 0.5f;
 float gyroKp = 2.4f;
 float gyroKd = 0.07f;
 
-int mode_count = 5;
+int mode_count = 4;
 int mode = 1;
 int dyn_mode = 1;
 
@@ -294,9 +294,9 @@ void loop()
   if (!en_gyro || !started)
     read_sensors(results, &error, ut);
 
-  if ((!started) ? results[0].Distance < 60 || results[1].Distance < 60 || results[2].Distance < 60 : error < -0.01)
+  if ((!started) ? results[0].Distance < 100 || results[1].Distance < 100 || results[2].Distance < 100 : error < -0.01)
     last_dir = -1;
-  else if ((!started) ? results[4].Distance < 60 || results[5].Distance < 60 || results[6].Distance < 60 : error > 0.01)
+  else if ((!started) ? results[4].Distance < 100 || results[5].Distance < 100 || results[6].Distance < 100 : error > 0.01)
     last_dir = 1;
 
   if (slow_down)
