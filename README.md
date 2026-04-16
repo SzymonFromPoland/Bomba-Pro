@@ -24,7 +24,7 @@ Bomba-Pro is a compact sumo robot designed for competitive micro-sumo competitio
 ### Software Features
 - **Adaptive PID Control** - Separate tuning profiles for normal and slow-approach modes
 - **Real-time Parameter Tuning** - Modify all control constants via web interface over WiFi
-- **EEPROM Persistence** - All settings saved across power cycles
+- **EEPROM Persistence** - All settings saved across power cycle    s
 - **Non-blocking IR Task** - Dual-core ESP32 handles IR commands without blocking main loop
 - **Gyro Calibration** - Automatic bias measurement with visual LED feedback
 - **Derivative Filtering** - Alpha-blended low-pass filtering for smooth control response
@@ -42,4 +42,4 @@ Bomba-Pro is a compact sumo robot designed for competitive micro-sumo competitio
 | Status LEDs | WS2812C-2020 (×7) | RGB NeoPixel LEDs |
 | IR Receiver | TSOP4838 | 38kHz, RC5 protocol compatible |
 
-## TO DO: ADD MORE LATER! --> -->
+## TO DO: ADD MORE LATER! -->

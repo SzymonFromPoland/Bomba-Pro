@@ -21,8 +21,10 @@ float threshold = 500.0f;
 
 float Kp = 75.0f;
 float Kd = 4.0f;
-float slowKp = 15.0f;
-float slowKd = 0.5f;
+float slowKp1 = 15.0f;
+float slowKd1 = 0.5f;
+float slowKp2 = 15.0f;
+float slowKd2 = 0.5f;
 float gyroKp = 2.4f;
 float gyroKd = 0.07f;
 
@@ -176,8 +178,10 @@ void setup()
   prefs_global.begin("robot", false);
   Kp = prefs_global.getFloat("kp", 75.0);
   Kd = prefs_global.getFloat("kd", 4.0);
-  slowKp = prefs_global.getFloat("skp", 15.0);
-  slowKd = prefs_global.getFloat("skd", 0.5);
+  slowKp1 = prefs_global.getFloat("skp1", 15.0);
+  slowKd1 = prefs_global.getFloat("skd1", 0.5);
+  slowKp2 = prefs_global.getFloat("skp2", 15.0);
+  slowKd2 = prefs_global.getFloat("skd2", 0.5);
   gyroKp = prefs_global.getFloat("gkp", 2.4);
   gyroKd = prefs_global.getFloat("gkd", 0.07);
   base_speed = prefs_global.getFloat("bs", 50.0);
@@ -209,8 +213,10 @@ void setup()
       {"Drive Kd", "kd", &Kd, 0, 100, 0.5, TYPE_ARROWS},
       {"Base Speed", "bs", &base_speed, 0, 100, 1, TYPE_ARROWS},
       {"Spin Speed", "sp", &spin_speed, 0, 100, 1, TYPE_ARROWS},
-      {"Slow Kp", "skp", &slowKp, 0, 100, 0.5, TYPE_ARROWS},
-      {"Slow Kd", "skd", &slowKd, 0, 100, 0.5, TYPE_ARROWS},
+      {"Slow Kp1", "skp1", &slowKp1, 0, 100, 0.5, TYPE_ARROWS},
+      {"Slow Kd1", "skd1", &slowKd1, 0, 100, 0.5, TYPE_ARROWS},
+      {"Slow Kp2", "skp2", &slowKp2, 0, 100, 0.5, TYPE_ARROWS},
+      {"Slow Kd2", "skd2", &slowKd2, 0, 100, 0.5, TYPE_ARROWS},
       {"Gyro Kp", "gkp", &gyroKp, 0, 10, 0.05, TYPE_ARROWS},
       {"Gyro Kd", "gkd", &gyroKd, 0, 10, 0.01, TYPE_ARROWS},
       {"Target Angle", "targ", &target_angle, -180, 180, 5, TYPE_SLIDER},
@@ -300,18 +306,24 @@ void loop()
     last_dir = 1;
 
   if (slow_down)
-    output = pid(error, dt, slowKp, 0.0f, slowKd, drivePID);
-  else if (dyn_mode == 2)
-    output = pid(error, dt, Kp / (base_speed / slow_speed), 0.0f, Kd / (base_speed / slow_speed), drivePID, 0.75);
+    output = pid(error, dt, slowKp1, 0.0f, slowKd1, drivePID, 0.75f);
+  else if (dyn_mode == 2 || dyn_mode == 3)
+    output = pid(error, dt, slowKp2, 0.0f, slowKd2, drivePID, 0.5f);
   else
-    output = pid(error, dt, Kp, 0.0f, Kd, drivePID, 0.75);
+    output = pid(error, dt, Kp, 0.0f, Kd, drivePID, 0.75f);
 
   bool any_ut1 = false;
+  bool any_ut2 = false;
   for (int i = 0; i < sc; i++)
   {
     if (ut[i])
     {
       any_ut1 = true;
+      break;
+    }
+    if (results[i].Distance < threshold / 2)
+    {
+      any_ut2 = true;
       break;
     }
   }
@@ -374,7 +386,7 @@ void loop()
         {
           closeTime = now;
         }
-        else if (now - closeTime > 500)
+        else if (now - closeTime > 330)
         {
           dyn_mode = 1;
           ramp_up1 = slow_speed - base_speed;
@@ -399,10 +411,10 @@ void loop()
       right_speed = gyro_output;
       if (target_reached)
       {
-        left_speed = slow_speed;
-        right_speed = slow_speed;
+        left_speed = slow_speed + output;
+        right_speed = slow_speed - output;
 
-        if (any_ut1 || now - panicTime > 1300)
+        if (any_ut2 || now - panicTime > 1300)
           dyn_mode = 2;
       }
       else
@@ -423,7 +435,7 @@ void loop()
         right_speed = slow_speed + ramp_up2;
 
         if (any_ut1 || now - panicTime > 300)
-          dyn_mode = 2;
+          dyn_mode = 1;
       }
       else
       {
